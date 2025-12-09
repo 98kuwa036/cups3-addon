@@ -1,0 +1,43 @@
+name: "CUPS 3 (OpenPrinting)"
+version: "3.0.0"
+slug: cups3
+description: "CUPS 3.x Print Server built from OpenPrinting source with IPP Everywhere support"
+url: "https://github.com/98kuwa036/cups3-addon"
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+init: false
+startup: services
+boot: auto
+ports:
+  631/tcp: 631
+ports_description:
+  631/tcp: "CUPS Web Interface and IPP"
+webui: "http://[HOST]:631"
+privileged:
+  - SYS_ADMIN
+devices:
+  - /dev/bus/usb
+usb: true
+apparmor: false
+hassio_api: true
+homeassistant_api: false
+host_network: true
+options:
+  admin_user: "admin"
+  admin_password: "changeme"
+  log_level: "info"
+  share_printers: true
+  browsing: true
+  allow_remote_admin: true
+schema:
+  admin_user: str
+  admin_password: password
+  log_level: list(debug|info|warning|error)
+  share_printers: bool
+  browsing: bool
+  allow_remote_admin: bool
+image: "ghcr.io/98kuwa036/cups3-addon-{arch}"
