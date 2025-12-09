@@ -1,0 +1,215 @@
+
+name: Build and Push Docker Images
+
+ 
+
+on:
+
+  push:
+
+    branches:
+
+      - main
+
+    tags:
+
+      - 'v*'
+
+  pull_request:
+
+    branches:
+
+      - main
+
+  workflow_dispatch:
+
+ 
+
+env:
+
+  REGISTRY: ghcr.io
+
+ 
+
+jobs:
+
+  build:
+
+    name: Build ${{ matrix.arch }}
+
+    runs-on: ubuntu-latest
+
+    permissions:
+
+      contents: read
+
+      packages: write
+
+    strategy:
+
+      matrix:
+
+        arch:
+
+          - aarch64
+
+          - amd64
+
+          - armhf
+
+          - armv7
+
+          - i386
+
+    steps:
+
+      - name: Checkout
+
+        uses: actions/checkout@v4
+
+ 
+
+      - name: Log in to GitHub Container Registry
+
+        uses: docker/login-action@v3
+
+        with:
+
+          registry: ${{ env.REGISTRY }}
+
+          username: ${{ github.actor }}
+
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+ 
+
+      - name: Extract metadata
+
+        id: meta
+
+        run: |
+
+          VERSION="${{ github.ref_name }}"
+
+          if [[ "$VERSION" == "main" ]]; then
+
+            VERSION="dev"
+
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          echo "build-date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+ 
+
+      - name: Set up QEMU
+
+        uses: docker/setup-qemu-action@v3
+
+ 
+
+      - name: Set up Docker Buildx
+
+        uses: docker/setup-buildx-action@v3
+
+ 
+
+      - name: Determine platform
+
+        id: platform
+
+        run: |
+
+          case "${{ matrix.arch }}" in
+
+            amd64)   echo "platform=linux/amd64" >> $GITHUB_OUTPUT ;;
+
+            i386)    echo "platform=linux/386" >> $GITHUB_OUTPUT ;;
+
+            armhf)   echo "platform=linux/arm/v6" >> $GITHUB_OUTPUT ;;
+
+            armv7)   echo "platform=linux/arm/v7" >> $GITHUB_OUTPUT ;;
+
+            aarch64) echo "platform=linux/arm64" >> $GITHUB_OUTPUT ;;
+
+          esac
+
+ 
+
+      - name: Build and push
+
+        uses: docker/build-push-action@v5
+
+        with:
+
+          context: .
+
+          file: ./Dockerfile
+
+          platforms: ${{ steps.platform.outputs.platform }}
+
+          push: ${{ github.event_name != 'pull_request' }}
+
+          tags: |
+
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/cups3-addon-${{ matrix.arch }}:${{ steps.meta.outputs.version }}
+
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/cups3-addon-${{ matrix.arch }}:latest
+
+          build-args: |
+
+            BUILD_FROM=ghcr.io/home-assistant/${{ matrix.arch }}-base:3.19
+
+            BUILD_ARCH=${{ matrix.arch }}
+
+            BUILD_DATE=${{ steps.meta.outputs.build-date }}
+
+            BUILD_REF=${{ github.sha }}
+
+            BUILD_VERSION=${{ steps.meta.outputs.version }}
+
+            CUPS_VERSION=3.0.0
+
+          cache-from: type=gha,scope=${{ matrix.arch }}
+
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+ 
+
+  release:
+
+    name: Create Release
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+
+      contents: write
+
+    steps:
+
+      - name: Checkout
+
+        uses: actions/checkout@v4
+
+ 
+
+      - name: Create Release
+
+        uses: softprops/action-gh-release@v1
+
+        with:
+
+          generate_release_notes: true
+
+          files: |
+
+            README.md
+
+            CHANGELOG.md
+
