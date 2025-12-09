@@ -1,0 +1,36 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Start Avahi daemon for printer discovery
+# ==============================================================================
+bashio::log.info "Starting Avahi daemon for printer discovery..."
+
+# Create avahi configuration
+mkdir -p /etc/avahi
+cat > /etc/avahi/avahi-daemon.conf <<EOFCONF
+[server]
+host-name=$(hostname)
+use-ipv4=yes
+use-ipv6=yes
+check-response-ttl=no
+use-iff-running=no
+
+[publish]
+publish-addresses=yes
+publish-hinfo=yes
+publish-workstation=no
+publish-domain=yes
+
+[reflector]
+enable-reflector=yes
+
+[rlimits]
+rlimit-core=0
+rlimit-data=4194304
+rlimit-fsize=0
+rlimit-nofile=768
+rlimit-stack=4194304
+rlimit-nproc=3
+EOFCONF
+
+# Start avahi-daemon
+exec /usr/sbin/avahi-daemon --no-chroot
