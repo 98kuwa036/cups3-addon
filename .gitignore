@@ -1,0 +1,22 @@
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+*.pyc
+__pycache__/
+.pytest_cache/
+
+# Secrets
+secrets.yaml
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
