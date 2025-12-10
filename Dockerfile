@@ -1,9 +1,6 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19
 FROM ${BUILD_FROM}
 
-# Set shell
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
 # Setup base
 ARG BUILD_ARCH
 ARG CUPS_VERSION=3.0.0
@@ -39,6 +36,9 @@ RUN apk add --no-cache \
     avahi-dev \
     libusb-dev \
     zlib-dev
+    
+# Set shell
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Build CUPS 3 from OpenPrinting source
 RUN echo "Building CUPS ${CUPS_VERSION} from OpenPrinting source..." \
