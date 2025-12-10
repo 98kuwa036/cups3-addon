@@ -14,6 +14,7 @@ RUN apk add --no-cache \
     avahi \
     avahi-tools \
     dbus \
+    nss-mdns \
     libusb \
     bash \
     jq \
@@ -81,10 +82,15 @@ RUN mkdir -p /var/cache/cups \
     && mkdir -p /var/spool/cups/tmp \
     && mkdir -p /var/run/cups \
     && mkdir -p /etc/cups \
-    && mkdir -p /config/cups-backups
+    && mkdir -p /config/cups-backups \
+    && mkdir -p /var/run/dbus \
+    && mkdir -p /var/lib/dbus
 
 # Create lpadmin group if it doesn't exist
 RUN addgroup -g 11 lpadmin 2>/dev/null || true
+
+# Initialize D-Bus machine ID
+RUN dbus-uuidgen > /var/lib/dbus/machine-id
 
 # Build arguments
 ARG BUILD_DATE

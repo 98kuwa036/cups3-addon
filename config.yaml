@@ -1,5 +1,5 @@
 name: "CUPS 3 (OpenPrinting) Enhanced"
-version: "3.1.0"
+version: "3.1.1"
 slug: cups3
 description: "Advanced CUPS 3.x Print Server with IPP Everywhere, auto-discovery, and Home Assistant integration"
 url: "https://github.com/98kuwa036/cups3-addon"

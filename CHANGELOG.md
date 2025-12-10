@@ -1,5 +1,28 @@
 # Changelog
 
+## 3.1.1 (2024-12-10) - D-Bus Fix
+
+### Bug Fixes
+
+- **D-Bus Service** - Added D-Bus daemon service (required for Avahi)
+- **nss-mdns** - Added nss-mdns package for mDNS support
+- **D-Bus Configuration** - Added system D-Bus configuration file
+- **Service Dependencies** - Fixed service startup order (D-Bus → Avahi → CUPS)
+
+### Technical Improvements
+
+- Initialize D-Bus machine ID during build
+- Create D-Bus runtime directories
+- Configure D-Bus system bus socket
+
+### Fixes
+
+- Resolved `Failed to connect to socket /var/run/dbus/system_bus_socket` error
+- Resolved `No NSS support for mDNS detected` warning
+- Enabled proper Avahi/mDNS functionality
+
+---
+
 ## 3.1.0 (2024-12-10) - Enhanced Edition
 
 ### Major Features
