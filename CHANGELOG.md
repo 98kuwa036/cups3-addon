@@ -9,6 +9,10 @@
 - **D-Bus Configuration** - Added system D-Bus configuration file
 - **Service Dependencies** - Fixed service startup order (D-Bus → Avahi → CUPS)
 
+### Architecture Support
+
+- **Removed i386 support** - i386 architecture removed due to package availability issues on Alpine Linux
+
 ### Technical Improvements
 
 - Initialize D-Bus machine ID during build
