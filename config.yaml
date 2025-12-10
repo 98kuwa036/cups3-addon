@@ -1,7 +1,7 @@
-name: "CUPS 3 (OpenPrinting)"
-version: "3.0.0"
+name: "CUPS 3 (OpenPrinting) Enhanced"
+version: "3.1.0"
 slug: cups3
-description: "CUPS 3.x Print Server built from OpenPrinting source with IPP Everywhere support"
+description: "Advanced CUPS 3.x Print Server with IPP Everywhere, auto-discovery, and Home Assistant integration"
 url: "https://github.com/98kuwa036/cups3-addon"
 arch:
   - aarch64
@@ -15,7 +15,7 @@ boot: auto
 ports:
   631/tcp: 631
 ports_description:
-  631/tcp: "CUPS Web Interface and IPP"
+  631/tcp: "CUPS Web Interface and IPP/IPPS"
 webui: "http://[HOST]:631"
 privileged:
   - SYS_ADMIN
@@ -24,20 +24,104 @@ devices:
 usb: true
 apparmor: false
 hassio_api: true
-homeassistant_api: false
+homeassistant_api: true
 host_network: true
+map:
+  - config:rw
+  - ssl
 options:
+  # Basic Configuration
   admin_user: "admin"
   admin_password: "changeme"
   log_level: "info"
+
+  # Printer Sharing & Discovery
   share_printers: true
   browsing: true
   allow_remote_admin: true
+  auto_discovery: true
+  broadcast_interval: 30
+
+  # IPP/IPPS Configuration
+  enable_ipps: false
+  ssl_cert: "/ssl/fullchain.pem"
+  ssl_key: "/ssl/privkey.pem"
+  require_encryption: false
+
+  # Performance & Limits
+  max_jobs: 500
+  max_jobs_per_printer: 100
+  job_history: true
+  preserve_job_history: true
+  preserve_job_files: "1d"
+
+  # Security
+  access_log: true
+  page_log: true
+  max_log_size: "10m"
+  allowed_networks: []
+
+  # Backup & Maintenance
+  auto_backup: true
+  backup_retention_days: 7
+  cleanup_temp_files: true
+
+  # Integration Support
+  enable_api: true
+  api_polling_interval: 30
+  publish_printer_info: true
+
+  # Advanced Options
+  debug_logging: false
+  raw_printing: true
+  legacy_printer_support: false
+
 schema:
+  # Basic Configuration
   admin_user: str
   admin_password: password
   log_level: list(debug|info|warning|error)
+
+  # Printer Sharing & Discovery
   share_printers: bool
   browsing: bool
   allow_remote_admin: bool
+  auto_discovery: bool
+  broadcast_interval: int(10,300)
+
+  # IPP/IPPS Configuration
+  enable_ipps: bool
+  ssl_cert: str?
+  ssl_key: str?
+  require_encryption: bool
+
+  # Performance & Limits
+  max_jobs: int(50,10000)
+  max_jobs_per_printer: int(10,1000)
+  job_history: bool
+  preserve_job_history: bool
+  preserve_job_files: list(1h|6h|1d|7d|30d|forever)
+
+  # Security
+  access_log: bool
+  page_log: bool
+  max_log_size: list(1m|5m|10m|50m|100m|unlimited)
+  allowed_networks:
+    - str
+
+  # Backup & Maintenance
+  auto_backup: bool
+  backup_retention_days: int(1,90)
+  cleanup_temp_files: bool
+
+  # Integration Support
+  enable_api: bool
+  api_polling_interval: int(10,300)
+  publish_printer_info: bool
+
+  # Advanced Options
+  debug_logging: bool
+  raw_printing: bool
+  legacy_printer_support: bool
+
 image: "ghcr.io/98kuwa036/cups3-addon-{arch}"
