@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.22
 FROM ${BUILD_FROM}
 
 # Setup base
@@ -6,7 +6,7 @@ ARG BUILD_ARCH
 ARG CUPS_VERSION=3.0.0
 
 # Install build dependencies and runtime dependencies
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories \
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories \
     && apk update \
     && apk add --no-cache \
     # Runtime dependencies
