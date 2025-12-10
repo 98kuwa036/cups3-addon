@@ -6,7 +6,9 @@ ARG BUILD_ARCH
 ARG CUPS_VERSION=3.0.0
 
 # Install build dependencies and runtime dependencies
-RUN apk add --no-cache \
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories \
+    && apk update \
+    && apk add --no-cache \
     # Runtime dependencies
     avahi \
     avahi-tools \
