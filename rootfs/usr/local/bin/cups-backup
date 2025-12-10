@@ -1,0 +1,223 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# CUPS Backup and Restore Utility
+# Backs up CUPS configuration, printers, and job history
+# ==============================================================================
+
+BACKUP_DIR="/config/cups-backups"
+CUPS_CONFIG_DIR="/etc/cups"
+CUPS_SPOOL_DIR="/var/spool/cups"
+
+# Ensure backup directory exists
+mkdir -p "$BACKUP_DIR"
+
+# Function to create backup
+backup() {
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local backup_file="${BACKUP_DIR}/cups_backup_${timestamp}.tar.gz"
+
+    bashio::log.info "Creating CUPS backup..."
+
+    # Create temporary directory for backup
+    local temp_dir=$(mktemp -d)
+
+    # Backup CUPS configuration
+    if [ -d "$CUPS_CONFIG_DIR" ]; then
+        mkdir -p "${temp_dir}/config"
+        cp -a "$CUPS_CONFIG_DIR"/* "${temp_dir}/config/" 2>/dev/null || true
+        bashio::log.debug "✓ Configuration files backed up"
+    fi
+
+    # Backup printer configurations
+    if command -v lpstat &>/dev/null; then
+        lpstat -p -d > "${temp_dir}/printers_list.txt" 2>/dev/null
+        lpstat -v > "${temp_dir}/printers_devices.txt" 2>/dev/null
+        bashio::log.debug "✓ Printer list backed up"
+    fi
+
+    # Export printer configurations
+    mkdir -p "${temp_dir}/printers"
+    for printer in $(lpstat -p 2>/dev/null | awk '{print $2}'); do
+        lpoptions -p "$printer" -l > "${temp_dir}/printers/${printer}.conf" 2>/dev/null || true
+    done
+
+    # Backup job history if enabled
+    if bashio::config.true 'preserve_job_history'; then
+        if [ -d "$CUPS_SPOOL_DIR" ]; then
+            mkdir -p "${temp_dir}/spool"
+            # Only backup job cache, not actual print files (they can be large)
+            find "$CUPS_SPOOL_DIR" -name "*.cache" -exec cp {} "${temp_dir}/spool/" \; 2>/dev/null || true
+            bashio::log.debug "✓ Job history backed up"
+        fi
+    fi
+
+    # Create backup metadata
+    cat > "${temp_dir}/backup_info.txt" <<EOF
+CUPS Backup Information
+=======================
+Timestamp: $(date)
+Hostname: $(hostname)
+CUPS Version: $(cupsd --version 2>&1 || echo "unknown")
+Addon Version: 3.1.0
+
+Printers:
+$(lpstat -p 2>/dev/null || echo "None")
+
+Configuration:
+- Admin User: $(bashio::config 'admin_user')
+- Share Printers: $(bashio::config 'share_printers')
+- Browsing: $(bashio::config 'browsing')
+- Auto Discovery: $(bashio::config 'auto_discovery')
+EOF
+
+    # Create compressed archive
+    tar -czf "$backup_file" -C "$temp_dir" . 2>&1 | bashio::log.debug
+
+    # Cleanup temp directory
+    rm -rf "$temp_dir"
+
+    if [ -f "$backup_file" ]; then
+        local size=$(du -h "$backup_file" | cut -f1)
+        bashio::log.info "✓ Backup created successfully: ${backup_file} (${size})"
+
+        # Cleanup old backups
+        cleanup_old_backups
+
+        return 0
+    else
+        bashio::log.error "✗ Backup creation failed"
+        return 1
+    fi
+}
+
+# Function to restore from backup
+restore() {
+    local backup_file=$1
+
+    if [ -z "$backup_file" ]; then
+        bashio::log.info "Available backups:"
+        ls -lh "$BACKUP_DIR"/*.tar.gz 2>/dev/null || bashio::log.warning "No backups found"
+        return 1
+    fi
+
+    if [ ! -f "$backup_file" ]; then
+        bashio::log.error "Backup file not found: $backup_file"
+        return 1
+    fi
+
+    bashio::log.warning "Restoring CUPS configuration from backup..."
+    bashio::log.warning "This will overwrite current configuration!"
+
+    # Create temporary directory for restore
+    local temp_dir=$(mktemp -d)
+
+    # Extract backup
+    tar -xzf "$backup_file" -C "$temp_dir" 2>&1 | bashio::log.debug
+
+    # Show backup info
+    if [ -f "${temp_dir}/backup_info.txt" ]; then
+        bashio::log.info "Backup information:"
+        cat "${temp_dir}/backup_info.txt" | bashio::log.info
+    fi
+
+    # Stop CUPS temporarily
+    bashio::log.info "Stopping CUPS..."
+    s6-svc -d /var/run/s6/services/cupsd 2>/dev/null || true
+    sleep 2
+
+    # Restore configuration files
+    if [ -d "${temp_dir}/config" ]; then
+        cp -a "${temp_dir}/config"/* "$CUPS_CONFIG_DIR/" 2>/dev/null || true
+        bashio::log.info "✓ Configuration files restored"
+    fi
+
+    # Restore spool if exists
+    if [ -d "${temp_dir}/spool" ] && bashio::config.true 'preserve_job_history'; then
+        cp -a "${temp_dir}/spool"/* "$CUPS_SPOOL_DIR/" 2>/dev/null || true
+        bashio::log.info "✓ Job history restored"
+    fi
+
+    # Cleanup temp directory
+    rm -rf "$temp_dir"
+
+    # Start CUPS
+    bashio::log.info "Starting CUPS..."
+    s6-svc -u /var/run/s6/services/cupsd 2>/dev/null || true
+
+    bashio::log.info "✓ Restore completed successfully"
+    bashio::log.info "Please check printer configurations"
+
+    return 0
+}
+
+# Function to cleanup old backups
+cleanup_old_backups() {
+    local retention_days=$(bashio::config 'backup_retention_days')
+
+    if [ "$retention_days" -gt 0 ]; then
+        bashio::log.debug "Cleaning up backups older than ${retention_days} days..."
+        find "$BACKUP_DIR" -name "cups_backup_*.tar.gz" -type f -mtime +${retention_days} -delete 2>/dev/null
+        bashio::log.debug "✓ Old backups cleaned up"
+    fi
+}
+
+# Function to list backups
+list_backups() {
+    bashio::log.info "=== Available CUPS Backups ==="
+    if [ -d "$BACKUP_DIR" ]; then
+        local count=$(ls -1 "$BACKUP_DIR"/cups_backup_*.tar.gz 2>/dev/null | wc -l)
+        if [ "$count" -gt 0 ]; then
+            ls -lh "$BACKUP_DIR"/cups_backup_*.tar.gz
+            echo ""
+            echo "Total backups: $count"
+        else
+            bashio::log.info "No backups found"
+        fi
+    else
+        bashio::log.info "Backup directory does not exist"
+    fi
+}
+
+# Auto-backup function (called from service)
+auto_backup() {
+    if bashio::config.true 'auto_backup'; then
+        bashio::log.info "Running automatic backup..."
+        backup
+    else
+        bashio::log.debug "Auto-backup is disabled"
+    fi
+}
+
+# Main command handler
+case "${1:-}" in
+    backup)
+        backup
+        ;;
+    restore)
+        restore "$2"
+        ;;
+    list)
+        list_backups
+        ;;
+    auto)
+        auto_backup
+        ;;
+    cleanup)
+        cleanup_old_backups
+        ;;
+    *)
+        echo "CUPS Backup and Restore Utility"
+        echo ""
+        echo "Usage: cups-backup <command> [options]"
+        echo ""
+        echo "Commands:"
+        echo "  backup                  - Create a new backup"
+        echo "  restore <file>          - Restore from backup"
+        echo "  list                    - List available backups"
+        echo "  cleanup                 - Remove old backups"
+        echo ""
+        echo "Backup location: $BACKUP_DIR"
+        echo ""
+        exit 1
+        ;;
+esac

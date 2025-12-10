@@ -19,6 +19,12 @@ RUN apk add --no-cache \
     jq \
     openssl \
     zlib \
+    curl \
+    wget \
+    tar \
+    gzip \
+    findutils \
+    coreutils \
     # Build dependencies
     git \
     gcc \
@@ -67,13 +73,18 @@ COPY rootfs /
 
 # Make scripts executable
 RUN chmod a+x /etc/services.d/*/run \
-    && chmod a+x /etc/services.d/*/finish
+    && chmod a+x /etc/services.d/*/finish \
+    && chmod a+x /usr/local/bin/cups-* 2>/dev/null || true
 
 # Create necessary directories
 RUN mkdir -p /var/cache/cups \
     && mkdir -p /var/spool/cups/tmp \
     && mkdir -p /var/run/cups \
-    && mkdir -p /etc/cups
+    && mkdir -p /etc/cups \
+    && mkdir -p /config/cups-backups
+
+# Create lpadmin group if it doesn't exist
+RUN addgroup -g 11 lpadmin 2>/dev/null || true
 
 # Build arguments
 ARG BUILD_DATE
@@ -82,14 +93,14 @@ ARG BUILD_VERSION
 
 # Labels
 LABEL \
-    io.hass.name="CUPS 3 (OpenPrinting)" \
-    io.hass.description="CUPS 3.x from OpenPrinting source with IPP Everywhere support" \
+    io.hass.name="CUPS 3 (OpenPrinting) Enhanced" \
+    io.hass.description="Advanced CUPS 3.x with IPP Everywhere, auto-discovery, backup, and Home Assistant integration" \
     io.hass.arch="${BUILD_ARCH}" \
     io.hass.type="addon" \
     io.hass.version="${BUILD_VERSION}" \
     maintainer="98kuwa036" \
-    org.opencontainers.image.title="CUPS 3 (OpenPrinting)" \
-    org.opencontainers.image.description="CUPS 3.x from OpenPrinting source with IPP Everywhere support" \
+    org.opencontainers.image.title="CUPS 3 (OpenPrinting) Enhanced" \
+    org.opencontainers.image.description="Advanced CUPS 3.x with IPP Everywhere, auto-discovery, backup, and Home Assistant integration" \
     org.opencontainers.image.vendor="Home Assistant Add-ons" \
     org.opencontainers.image.authors="98kuwa036" \
     org.opencontainers.image.licenses="Apache-2.0" \

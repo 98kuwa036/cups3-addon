@@ -1,0 +1,183 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# CUPS Management Utility
+# Provides printer management commands
+# ==============================================================================
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to list all printers
+list_printers() {
+    bashio::log.info "=== Installed Printers ==="
+    lpstat -p -d 2>/dev/null || bashio::log.warning "No printers configured"
+    echo ""
+}
+
+# Function to show printer details
+show_printer() {
+    local printer=$1
+    if [ -z "$printer" ]; then
+        bashio::log.error "Printer name required"
+        return 1
+    fi
+
+    bashio::log.info "=== Printer Details: $printer ==="
+    lpstat -l -p "$printer" 2>/dev/null || bashio::log.error "Printer not found: $printer"
+    echo ""
+    lpoptions -p "$printer" -l 2>/dev/null || true
+}
+
+# Function to test printer
+test_printer() {
+    local printer=$1
+    if [ -z "$printer" ]; then
+        bashio::log.error "Printer name required"
+        return 1
+    fi
+
+    bashio::log.info "Sending test page to: $printer"
+    echo -e "CUPS Test Page\n\nPrinter: $printer\nTime: $(date)\nHostname: $(hostname)" | lp -d "$printer" -
+    if [ $? -eq 0 ]; then
+        bashio::log.info "✓ Test page sent successfully"
+    else
+        bashio::log.error "✗ Failed to send test page"
+    fi
+}
+
+# Function to enable/disable printer
+toggle_printer() {
+    local action=$1
+    local printer=$2
+
+    if [ -z "$printer" ]; then
+        bashio::log.error "Printer name required"
+        return 1
+    fi
+
+    case "$action" in
+        enable)
+            cupsenable "$printer" 2>&1 | bashio::log.debug
+            cupsaccept "$printer" 2>&1 | bashio::log.debug
+            bashio::log.info "✓ Printer enabled: $printer"
+            ;;
+        disable)
+            cupsdisable "$printer" 2>&1 | bashio::log.debug
+            bashio::log.info "✓ Printer disabled: $printer"
+            ;;
+        pause)
+            cupsdisable "$printer" 2>&1 | bashio::log.debug
+            bashio::log.info "✓ Printer paused: $printer"
+            ;;
+        resume)
+            cupsenable "$printer" 2>&1 | bashio::log.debug
+            bashio::log.info "✓ Printer resumed: $printer"
+            ;;
+        *)
+            bashio::log.error "Invalid action: $action"
+            return 1
+            ;;
+    esac
+}
+
+# Function to show print queue
+show_queue() {
+    local printer=$1
+    bashio::log.info "=== Print Queue ==="
+    if [ -z "$printer" ]; then
+        lpstat -o 2>/dev/null || bashio::log.info "No pending jobs"
+    else
+        lpstat -o "$printer" 2>/dev/null || bashio::log.info "No pending jobs for: $printer"
+    fi
+    echo ""
+}
+
+# Function to cancel jobs
+cancel_jobs() {
+    local printer=$1
+    if [ -z "$printer" ]; then
+        bashio::log.info "Cancelling all jobs..."
+        cancel -a 2>&1 | bashio::log.debug
+        bashio::log.info "✓ All jobs cancelled"
+    else
+        bashio::log.info "Cancelling jobs for: $printer"
+        cancel -a "$printer" 2>&1 | bashio::log.debug
+        bashio::log.info "✓ Jobs cancelled for: $printer"
+    fi
+}
+
+# Function to get printer statistics
+printer_stats() {
+    local printer=$1
+    if [ -z "$printer" ]; then
+        bashio::log.error "Printer name required"
+        return 1
+    fi
+
+    bashio::log.info "=== Printer Statistics: $printer ==="
+
+    # Get printer status
+    local status=$(lpstat -p "$printer" 2>/dev/null | head -1)
+    echo "Status: $status"
+
+    # Get job count
+    local jobs=$(lpstat -o "$printer" 2>/dev/null | wc -l)
+    echo "Pending Jobs: $jobs"
+
+    # Get printer attributes via ipptool if available
+    if command -v ipptool &>/dev/null; then
+        local uri=$(lpstat -v "$printer" 2>/dev/null | awk '{print $NF}')
+        if [ -n "$uri" ]; then
+            echo ""
+            echo "Printer URI: $uri"
+        fi
+    fi
+    echo ""
+}
+
+# Main command handler
+case "${1:-}" in
+    list)
+        list_printers
+        ;;
+    show)
+        show_printer "$2"
+        ;;
+    test)
+        test_printer "$2"
+        ;;
+    enable|disable|pause|resume)
+        toggle_printer "$1" "$2"
+        ;;
+    queue)
+        show_queue "$2"
+        ;;
+    cancel)
+        cancel_jobs "$2"
+        ;;
+    stats)
+        printer_stats "$2"
+        ;;
+    *)
+        echo "CUPS Management Utility"
+        echo ""
+        echo "Usage: cups-manage <command> [options]"
+        echo ""
+        echo "Commands:"
+        echo "  list                    - List all printers"
+        echo "  show <printer>          - Show printer details"
+        echo "  test <printer>          - Send test page"
+        echo "  enable <printer>        - Enable printer"
+        echo "  disable <printer>       - Disable printer"
+        echo "  pause <printer>         - Pause printer"
+        echo "  resume <printer>        - Resume printer"
+        echo "  queue [printer]         - Show print queue"
+        echo "  cancel [printer]        - Cancel jobs"
+        echo "  stats <printer>         - Show printer statistics"
+        echo ""
+        exit 1
+        ;;
+esac

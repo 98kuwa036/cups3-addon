@@ -1,0 +1,15 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Start Auto-Discovery Service
+# ==============================================================================
+declare auto_discovery
+
+auto_discovery=$(bashio::config 'auto_discovery')
+
+if bashio::var.true "${auto_discovery}"; then
+    bashio::log.info "Starting printer auto-discovery service..."
+    exec /usr/local/bin/cups-auto-discover
+else
+    bashio::log.info "Auto-discovery is disabled, service will not start"
+    exec sleep infinity
+fi

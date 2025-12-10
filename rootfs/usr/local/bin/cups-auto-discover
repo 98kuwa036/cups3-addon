@@ -1,0 +1,114 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# CUPS Auto-Discovery Script
+# Automatically discovers and configures IPP Everywhere printers
+# ==============================================================================
+
+DISCOVERY_ENABLED=$(bashio::config 'auto_discovery')
+BROADCAST_INTERVAL=$(bashio::config 'broadcast_interval')
+
+if ! bashio::var.true "${DISCOVERY_ENABLED}"; then
+    bashio::log.info "Auto-discovery is disabled"
+    exit 0
+fi
+
+bashio::log.info "Starting printer auto-discovery..."
+
+# Function to discover printers via DNS-SD
+discover_printers() {
+    bashio::log.info "Scanning for IPP Everywhere printers..."
+
+    # Use avahi-browse to find IPP printers
+    timeout 10 avahi-browse -t _ipp._tcp --resolve --parsable 2>/dev/null | while IFS=',' read -r type iface proto name stype domain hostname address port txt; do
+        if [[ "$type" == "=" ]]; then
+            bashio::log.info "Found printer: $name at $address:$port"
+
+            # Extract printer info
+            PRINTER_NAME=$(echo "$name" | tr ' ' '_' | tr -cd '[:alnum:]_-')
+            PRINTER_URI="ipp://${address}:${port}/ipp/print"
+
+            # Check if printer already exists
+            if ! lpstat -p "$PRINTER_NAME" &>/dev/null; then
+                bashio::log.info "Adding new printer: $PRINTER_NAME"
+
+                # Add printer using IPP Everywhere (driverless)
+                lpadmin -p "$PRINTER_NAME" \
+                    -v "$PRINTER_URI" \
+                    -m everywhere \
+                    -E \
+                    -o printer-is-shared=$(bashio::config 'share_printers' && echo "true" || echo "false") \
+                    2>&1 | bashio::log.debug
+
+                if [ $? -eq 0 ]; then
+                    bashio::log.info "✓ Successfully added printer: $PRINTER_NAME"
+                    cupsenable "$PRINTER_NAME" 2>/dev/null
+                    cupsaccept "$PRINTER_NAME" 2>/dev/null
+                else
+                    bashio::log.warning "Failed to add printer: $PRINTER_NAME"
+                fi
+            else
+                bashio::log.debug "Printer already exists: $PRINTER_NAME"
+            fi
+        fi
+    done
+
+    # Also check for IPPS (secure IPP)
+    timeout 10 avahi-browse -t _ipps._tcp --resolve --parsable 2>/dev/null | while IFS=',' read -r type iface proto name stype domain hostname address port txt; do
+        if [[ "$type" == "=" ]]; then
+            bashio::log.info "Found IPPS printer: $name at $address:$port"
+
+            PRINTER_NAME=$(echo "$name" | tr ' ' '_' | tr -cd '[:alnum:]_-')_secure
+            PRINTER_URI="ipps://${address}:${port}/ipp/print"
+
+            if ! lpstat -p "$PRINTER_NAME" &>/dev/null; then
+                bashio::log.info "Adding new IPPS printer: $PRINTER_NAME"
+
+                lpadmin -p "$PRINTER_NAME" \
+                    -v "$PRINTER_URI" \
+                    -m everywhere \
+                    -E \
+                    -o printer-is-shared=$(bashio::config 'share_printers' && echo "true" || echo "false") \
+                    2>&1 | bashio::log.debug
+
+                if [ $? -eq 0 ]; then
+                    bashio::log.info "✓ Successfully added IPPS printer: $PRINTER_NAME"
+                    cupsenable "$PRINTER_NAME" 2>/dev/null
+                    cupsaccept "$PRINTER_NAME" 2>/dev/null
+                else
+                    bashio::log.warning "Failed to add IPPS printer: $PRINTER_NAME"
+                fi
+            fi
+        fi
+    done
+}
+
+# Function to publish printer information to Home Assistant
+publish_printer_info() {
+    if bashio::config.true 'publish_printer_info' && bashio::config.true 'enable_api'; then
+        bashio::log.debug "Publishing printer information to Home Assistant..."
+
+        # Get list of all printers
+        lpstat -p -d 2>/dev/null | while read -r line; do
+            if [[ $line =~ ^printer ]]; then
+                PRINTER=$(echo "$line" | awk '{print $2}')
+                STATE=$(echo "$line" | grep -o "idle\|processing\|stopped" || echo "unknown")
+
+                bashio::log.debug "Printer: $PRINTER - State: $STATE"
+
+                # You can add API calls here to publish to Home Assistant
+                # For now, just log the information
+            fi
+        done
+    fi
+}
+
+# Main discovery loop
+bashio::log.info "Auto-discovery interval: ${BROADCAST_INTERVAL} seconds"
+
+while true; do
+    discover_printers
+    publish_printer_info
+
+    bashio::log.debug "Next discovery scan in ${BROADCAST_INTERVAL} seconds..."
+    sleep "${BROADCAST_INTERVAL}"
+done
