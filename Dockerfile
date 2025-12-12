@@ -15,49 +15,47 @@ ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PATH=/usr/local/bin:/usr/local/sbin:$PATH
 
 # Install runtime and build dependencies
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories \
-    && apk update \
-    && apk add --no-cache \
-    # Runtime dependencies
+# Runtime: avahi, dbus, libusb, openssl, gnutls, zlib, libpng, libjpeg-turbo, tiff, linux-pam
+# Build: git, gcc, g++, make, autotools, dev packages
+RUN apk add --no-cache \
     avahi \
-    avahi-tools \
-    dbus \
-    nss-mdns \
-    libusb \
-    bash \
-    jq \
-    openssl \
-    gnutls \
-    zlib \
-    libpng \
-    libjpeg-turbo \
-    tiff \
-    linux-pam \
-    curl \
-    wget \
-    tar \
-    gzip \
-    findutils \
-    coreutils \
-    # Build dependencies
-    git \
-    gcc \
-    g++ \
-    make \
-    automake \
-    autoconf \
-    libtool \
-    pkgconf \
-    openssl-dev \
-    gnutls-dev \
+    avahi-compat-libdns_sd \
     avahi-dev \
-    libusb-dev \
-    zlib-dev \
-    libpng-dev \
+    avahi-tools \
+    autoconf \
+    automake \
+    bash \
+    coreutils \
+    curl \
+    dbus \
+    dbus-dev \
+    findutils \
+    g++ \
+    gcc \
+    git \
+    gnutls \
+    gnutls-dev \
+    gzip \
+    jq \
+    libjpeg-turbo \
     libjpeg-turbo-dev \
-    tiff-dev \
+    libpng \
+    libpng-dev \
+    libtool \
+    libusb \
+    libusb-dev \
+    linux-pam \
     linux-pam-dev \
-    dbus-dev
+    make \
+    openssl \
+    openssl-dev \
+    pkgconf \
+    tar \
+    tiff \
+    tiff-dev \
+    wget \
+    zlib \
+    zlib-dev
 
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
