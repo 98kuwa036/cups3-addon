@@ -1,5 +1,5 @@
 #!/usr/bin/with-contenv bashio
 # ==============================================================================
-# Handle CUPS daemon shutdown
+# Handle CUPS 3.0 Sharing Server shutdown
 # ==============================================================================
-bashio::log.info "CUPS daemon stopped"
+bashio::log.info "CUPS 3.0 Sharing Server stopped"
